@@ -2,7 +2,6 @@ from PySide6.QtCore import QObject, QTimer, QUrl, Signal, Slot, Qt, QThread,Prop
 import numpy as np
 import cv2
 import random as rng
-import base64
 import io
 from PIL import Image
 
@@ -129,15 +128,8 @@ class AreaCalculator(QObject):
         if key in self.img_cache:
             return self.img_cache[key]
 
-        # 转 Base64（给 QML 用）
-        # img_base64 = base64.b64encode(buffer).decode('utf-8')
-        # 5. 低质量JPEG + 一次Base64
-
-        # img 是你的 OpenCV 图像（BGR格式）
-        # 编码成 JPG 格式
-        success, buffer = cv2.imencode('.jpg', img)
-        _, buf = cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, 60])
-        b64 = base64.b64encode(buf).decode()
+        # 图片通过 image://opencv 提供器直接传原始 OpenCV 数组，
+        # 不再走 base64/JPEG 编码链路
         # 带序号前缀的 URI：image://opencv/v{序号}/{key}
         # QML 侧 Image.source 每次变化，强制重新请求图片，避免换图后仍显示旧图
         self.img_seq += 1

@@ -2,7 +2,7 @@ import QtQuick 2.0
 import QtQuick.Controls 2.1
 import "."
 
-// 主题化参数输入框：上方标签 + 下方数值，editable=true 时可编辑
+// 主题化参数输入框：标签与数值同一行横排，editable=true 时可编辑
 Rectangle {
     id: root
 
@@ -10,8 +10,8 @@ Rectangle {
     property alias text: textInput.text
     property bool editable: false
 
-    implicitWidth: 96
-    implicitHeight: 46
+    implicitWidth: 132
+    implicitHeight: 30
     radius: 6
     color: Theme.cardBg
     border.width: 1
@@ -19,9 +19,9 @@ Rectangle {
 
     Text {
         id: labelText
-        anchors.top: parent.top
-        anchors.topMargin: 3
-        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.left: parent.left
+        anchors.leftMargin: 8
+        anchors.verticalCenter: parent.verticalCenter
         text: root.label
         font.pixelSize: 11
         color: Theme.textDim
@@ -29,13 +29,14 @@ Rectangle {
 
     TextInput {
         id: textInput
-        anchors.left: parent.left
+        anchors.left: labelText.right
+        anchors.leftMargin: 6
         anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 2
-        horizontalAlignment: Text.AlignHCenter
+        anchors.rightMargin: 6
+        anchors.verticalCenter: parent.verticalCenter
+        horizontalAlignment: Text.AlignRight
         verticalAlignment: Text.AlignVCenter
-        font.pixelSize: 14
+        font.pixelSize: 13
         font.bold: true
         color: root.enabled ? Theme.text : Theme.textDisabled
         readOnly: !root.editable

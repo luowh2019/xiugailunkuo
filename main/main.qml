@@ -44,7 +44,7 @@ ApplicationWindow {
     property alias img_url: imgCanvas.url
 
     // 底部状态栏：是否展开历史消息面板
-    property bool bot_expanded: true
+    property bool bot_expanded: false
 
     property bool showBiaoding: false
     property bool showCrop: false
@@ -159,6 +159,15 @@ ApplicationWindow {
         page.resetContourNav()
     }
 
+    // 从 Python 侧同步图像原始像素尺寸（镜像/旋转/裁剪后尺寸会变化）
+    function refreshImgSize() {
+        var sz = areaCalculator.get_img_size()
+        if (sz && sz.length === 2 && sz[0] > 0 && sz[1] > 0) {
+            page.img_w = sz[0]
+            page.img_h = sz[1]
+        }
+    }
+
     FileDialog {
         id: fileSave
         title: '保存文件'
@@ -217,6 +226,9 @@ ApplicationWindow {
                 color: Theme.text
                 horizontalAlignment: Qt.AlignHCenter
                 verticalAlignment: Qt.AlignVCenter
+                validator: DoubleValidator {
+                notation: DoubleValidator.StandardNotation
+            }
 
                 // 把回车绑定在【输入框】上
                 Keys.onReturnPressed: inputDialog.accept()
@@ -331,31 +343,14 @@ ApplicationWindow {
                     primary: true
                     onClicked: fileDialog.open()
                 }
-                AppButton {
-                    id: show_contour_btn
-                    text: "🔍 显示轮廓"
-                    enabled: false
-                    onClicked: {
-                        if (!page.url) {
-                            page.append_msg("请先导入图像")
-                            return
-                        }
-                        var uri = areaCalculator.run_contours()
-                        if (!uri) {
-                            page.append_msg("提取轮廓失败：请检查图像是否有效")
-                            return
-                        }
-                        page.img_url = uri
-                        var n = page.resetContourNav()
-                        page.append_msg("已提取 " + n + " 个轮廓，点击「下一个轮廓」定位要修改的轮廓")
-                    }
-                }
+
                 AppButton {
                     id: imgcv_vertical
                     text: "⚒️ 镜像"
                     enabled:false
                     onClicked: {
                         areaCalculator.get_jx()
+                        page.refreshImgSize()
                         page.img_url = areaCalculator.get_img("img")
                         page.resetContourNav()
                         page.append_msg("图像已镜像，点击「显示轮廓」重新提取轮廓")
@@ -367,6 +362,7 @@ ApplicationWindow {
                     enabled:false
                     onClicked: {
                         areaCalculator.get_90()
+                        page.refreshImgSize()
                         page.img_url = areaCalculator.get_img("img")
                         page.resetContourNav()
                         page.append_msg("图像已旋转，点击「显示轮廓」重新提取轮廓")
@@ -420,7 +416,25 @@ ApplicationWindow {
                 Layout.preferredHeight: 40
                 Layout.fillWidth: true
                 spacing: 8
-
+                AppButton {
+                    id: show_contour_btn
+                    text: "🔍 显示轮廓"
+                    enabled: false
+                    onClicked: {
+                        if (!page.url) {
+                            page.append_msg("请先导入图像")
+                            return
+                        }
+                        var uri = areaCalculator.run_contours()
+                        if (!uri) {
+                            page.append_msg("提取轮廓失败：请检查图像是否有效")
+                            return
+                        }
+                        page.img_url = uri
+                        var n = page.resetContourNav()
+                        page.append_msg("已提取 " + n + " 个轮廓，点击「下一个轮廓」定位要修改的轮廓")
+                    }
+                }
                 AppButton {
                     id: fore_contour
                     text: "◀️ 上一个轮廓"
@@ -570,44 +584,39 @@ ApplicationWindow {
                         id: contourParamModel
                     }
 
-                    ColumnLayout {
-                        Layout.preferredWidth: 128
-                        spacing: 2
+                    RowLayout {
+                        Layout.preferredWidth: 200
+                        spacing: 4
 
                         Text {
-                            Layout.fillWidth: true
+                            Layout.preferredWidth: 48
                             text: model.label
                             font.pixelSize: 11
                             color: Theme.textDim
-                            horizontalAlignment: Text.AlignHCenter
+                            horizontalAlignment: Text.AlignLeft
                             elide: Text.ElideRight
                         }
-                        RowLayout {
+                        Slider {
+                            id: pSlider
                             Layout.fillWidth: true
-                            spacing: 4
-
-                            Slider {
-                                id: pSlider
-                                Layout.fillWidth: true
-                                from: model.min
-                                to: model.max
-                                stepSize: model.step
-                                value: model.value
-                                enabled: !page.showXiugai
-                                onValueChanged: {
-                                    if (!pSlider.pressed) return
-                                    page.pendingKey = model.key
-                                    page.pendingValue = value
-                                    paramTimer.restart()
-                                }
+                            from: model.min
+                            to: model.max
+                            stepSize: model.step
+                            value: model.value
+                            enabled: !page.showXiugai
+                            onValueChanged: {
+                                if (!pSlider.pressed) return
+                                page.pendingKey = model.key
+                                page.pendingValue = value
+                                paramTimer.restart()
                             }
-                            Text {
-                                Layout.preferredWidth: 26
-                                text: Math.round(pSlider.value)
-                                font.pixelSize: 11
-                                color: Theme.text
-                                horizontalAlignment: Text.AlignRight
-                            }
+                        }
+                        Text {
+                            Layout.preferredWidth: 26
+                            text: Math.round(pSlider.value)
+                            font.pixelSize: 11
+                            color: Theme.text
+                            horizontalAlignment: Text.AlignRight
                         }
                     }
                 }
@@ -636,12 +645,8 @@ ApplicationWindow {
             mode: page.showXiugai ? "edit"
                 : (page.showCrop ? "crop" : "display")
 
-            onSpt_wChanged:{
-                page.img_w = spt_w
-            }
-            onSpt_hChanged:{
-                page.img_h = spt_h
-            }
+            // img_w/img_h 以 Python 侧 get_img_size() 原始像素为准，
+            // 不再由 imgSource.sourceSize 覆盖（其受 2048 上限缩放，会破坏坐标换算）
             onCan_addChanged:{
                 next_contour.enabled = false
                 fore_contour.enabled = true
@@ -700,6 +705,7 @@ ApplicationWindow {
 
                 // 裁剪后仅显示原图，轮廓需重新点击「显示轮廓」
                 areaCalculator.get_crop(page.crop_array)
+                page.refreshImgSize()
                 page.img_url = areaCalculator.get_img("img")
                 page.resetContourNav()
                 imgcv_crop.enabled = true

@@ -75,6 +75,12 @@ Canvas {
     Image {
         id: imgSource
         visible: false
+        // 限制加载分辨率（长边 2048 等比）：超大图直接以原尺寸进入
+        // Canvas 2D drawImage 会触发纹理降级/栅格化（光栅图），
+        // 先降到合理尺寸可保证显示平滑稳定
+        sourceSize.width: 2048
+        sourceSize.height: 2048
+        smooth: true
         onStatusChanged: {
             if (imgSource.status === Image.Loading) {
                 busy.running = true
@@ -82,10 +88,10 @@ Canvas {
             } else if (imgSource.status === Image.Ready) {
                 busy.running = false
                 if (url) {
-                    spt_w = imgSource.sourceSize.width
-                    spt_h = imgSource.sourceSize.height
+                    // 尺寸以 Python 侧 get_img_size() 的原始像素为准，
+                    // 此处不再用 sourceSize（可能被 2048 上限缩放）覆盖
+                    imgCanvas.requestPaint()
                 }
-                imgCanvas.requestPaint()
             } else if (imgSource.status === Image.Error) {
                 busy.running = false
                 stateLabel.visible = true
@@ -196,6 +202,7 @@ Canvas {
     onPaint: {
         var ctx = getContext("2d")
         ctx.clearRect(0, 0, width, height)
+        ctx.imageSmoothingEnabled = true
         ctx.save()
         ctx.translate(canvasOffsetX, canvasOffsetY)
         ctx.scale(canvasScale, canvasScale)
